@@ -2,16 +2,20 @@
 #include"afxwin.h"
 #include "ClassSerial.h"
 //Конструктор
-  ClassSerial::ClassSerial(void)
-    :bOpened(false) 
-{
-    hComDev = NULL;
-     
+ClassSerial::ClassSerial(void)
+    : bOpened(false), hComDev(NULL) {
+    memset(&sOverRead, 0, sizeof(OVERLAPPED));
+    memset(&sOverWrite, 0, sizeof(OVERLAPPED));
 }
-//Деконструк
-ClassSerial::~ClassSerial(void)
-{
 
+// Destructor
+ClassSerial::~ClassSerial(void) {
+    
+    CloseHandle(hComDev);
+    sOverRead;
+    sOverWrite;
+    ClosePort(); // Ensure port is closed on destruction
+   
 }
 
 // Открытие порта
@@ -22,8 +26,8 @@ BOOL ClassSerial::OpenPort(CString nPort, DWORD nBaund, BYTE nBite, BYTE nPary, 
     hComDev = CreateFile(nPort, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
        if (hComDev == NULL) //Проверка успеха создания порта
          return FALSE; 
-   memset(&sOverRead, 0, sizeof(OVERLAPPED)); //Очистка сруктуры чтения
-   memset(&sOverWrite, 0, sizeof(OVERLAPPED)); //Очистка сруктуры записи
+ //  memset(&sOverRead, 0, sizeof(OVERLAPPED)); //Очистка сруктуры чтения
+//   memset(&sOverWrite, 0, sizeof(OVERLAPPED)); //Очистка сруктуры записи
    sOverRead.hEvent = CreateEvent(NULL, TRUE, TRUE, NULL);
    sOverWrite.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
    COMMTIMEOUTS ComTimeOut; //Структура тайаутов компорта

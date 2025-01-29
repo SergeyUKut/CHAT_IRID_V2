@@ -7,7 +7,7 @@
 #include "CHAT_IRID_V2.h"
 #include "CHAT_IRID_V2Dlg.h"
 #include "afxdialogex.h"
-
+#include <memory>
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -61,6 +61,7 @@ END_MESSAGE_MAP()
 CCHATIRIDV2Dlg::CCHATIRIDV2Dlg(CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_CHAT_IRID_V2_DIALOG, pParent)
 	, str(_T(""))
+	
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -77,6 +78,7 @@ void CCHATIRIDV2Dlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_LI_RECEIV, liReceiv);
 	DDX_Control(pDX, IDC_BUT_OPPORT, btPort);
 	DDX_LBString(pDX, IDC_LI_RECEIV, str);
+	DDX_Control(pDX, IDC_STAT_IEMI, IN_IMEI);
 }
 
 BEGIN_MESSAGE_MAP(CCHATIRIDV2Dlg, CDialogEx)
@@ -177,38 +179,39 @@ HCURSOR CCHATIRIDV2Dlg::OnQueryDragIcon()
 }
 
 //Поток приема данных
- UINT StreamData(LPVOID pParam) {
-	CCHATIRIDV2Dlg* ChatDlg = (CCHATIRIDV2Dlg*)pParam; //Получение дескриптора основного класса
-	int iInDat = 0, iInOldDat = 0;
-	while (ChatDlg->cSerial.IsOpened())  // цикл пока открыто соединение
-	{
-		iInDat = ChatDlg->cSerial.WaitLngData(); //Проверка кол-ва данных в буфере приема
-		if (iInDat != 0) 
-		{
-			if (iInDat != iInOldDat)  //Проверка именения кол-ва данных в буфере
-			{   
-				BYTE* buffer = new BYTE[iInDat]; // выделение места под буфер приёма
-				iInDat = ChatDlg->cSerial.ReadData(buffer, iInDat); 
-				if (iInDat > 0)
-				//	ChatDlg->MessageBoxA((CString)buffer);
-					ChatDlg->InDATA(buffer, iInDat); //Переход на обработку и вывод
-				
-				iInDat = iInOldDat = 0;
-				
-				delete[] buffer;
+// Поток приема данных
+UINT StreamData(LPVOID pParam) {
+	CCHATIRIDV2Dlg* ChatDlg = (CCHATIRIDV2Dlg*)pParam;
+	
+	
+		if (ChatDlg->cSerial.IsOpened()) {
+			CString AT = L"AT+SBDRT";//Проверка буфера буфера входящих
+			AT += BYTE(0x0d);
+			int iLen = AT.GetLength();
+			auto buffer = std::make_unique<BYTE[]>(iLen); // Используем unique_ptr
+			for (int i = 0; i < iLen; i++)
+			{
+				buffer[i] = AT[i];
 			}
-			else {
-				iInDat = iInOldDat;
-				Sleep(10);
-				//delete[] buffer;
+
+			int iTX = ChatDlg->cSerial.SendData(buffer.get(), iLen);
+
+			Sleep(200);
+			int iInDat = ChatDlg->cSerial.WaitLngData();
+			if (iInDat > 0) {
+				auto buffer = std::make_unique<BYTE[]>(iInDat); // Используем unique_ptr
+				if (ChatDlg->cSerial.ReadData(buffer.get(), iInDat)) {
+					ChatDlg->InDATA(std::move(buffer), iInDat); // Передача владения буфером в InDATA
+				}
+				Sleep(200);
 			}
+			Sleep(600);
 		}
 		else
 			Sleep(10);
-		 
-
-		
-	}
+	
+	return 0;
+}
 	//if (!ChatDlg->cSerial.IsOpened()) { AfxEndThread(0, 1); }
 	AfxEndThread(0, 1);
 	return 0;
@@ -221,26 +224,75 @@ afx_msg void CCHATIRIDV2Dlg:: OnBnClickedButOpport()
 	if (!cSerial.IsOpened()) 
 	{
 		CString strPort, strBiteRate, strBitN;
-		comPort.GetWindowTextA(strPort); // получение названия порта
-		comBiteRate.GetWindowTextA(strBiteRate);//Получение скорости
-		comBitn.GetWindowTextA(strBitN);
+		comPort.GetWindowText(strPort); // получение названия порта
+		comBiteRate.GetWindowText(strBiteRate);//Получение скорости
+		comBitn.GetWindowText(strBitN);
 		int iPary = comPary.GetCurSel();
 		int iStopB = comStopBit.GetCurSel();
-		if (cSerial.OpenPort(strPort, atoi(strBiteRate), atoi(strBitN), iPary, iStopB)) 
+		if (cSerial.OpenPort(strPort, _wtoi(strBiteRate), _wtoi(strBitN), iPary, iStopB))
 		{
-				btPort.SetWindowText("Закрыть");//вывод в кнопку приоткрытии порта
-				comPort.EnableWindow(false); //блокировка списка параметров
-				comBiteRate.EnableWindow(false);
-				comBitn.EnableWindow(false);
-				comPary.EnableWindow(false);
-				comStopBit.EnableWindow(false);
-				AfxBeginThread(StreamData, this); //Запуск потока
+			btPort.SetWindowText(L"Закрыть");//вывод в кнопку приоткрытии порта
+			comPort.EnableWindow(false); //блокировка списка параметров
+			comBiteRate.EnableWindow(false);
+			comBitn.EnableWindow(false);
+			comPary.EnableWindow(false);
+			comStopBit.EnableWindow(false);
+			//AfxBeginThread(StreamData, this); //Запуск потока
+
+			//работа смодемом
+
+			// Работа с модемом
+			CString AT = L"ATE0";//отключение эха
+			AT += BYTE(0x0d);
+			int iLen = AT.GetLength();
+			auto buffer = std::make_unique<BYTE[]>(iLen); // Используем unique_ptr
+			for (int i = 0; i < iLen; i++)
+				buffer[i] = AT[i];
+			int iTX = cSerial.SendData(buffer.get(), iLen);
+			if (iTX == iLen) {
+				Sleep(300);
 			}
 
+			AT = "AT+GSN";//запрос IEMI
+			AT += char(0x0d);
+			iLen = AT.GetLength();
+			buffer = std::make_unique<BYTE[]>(iLen); // Используем unique_ptr
+			for (int i = 0; i < iLen; i++)
+				buffer[i] = AT[i];
+			iTX = cSerial.SendData(buffer.get(), iLen);
 
-	}  else {
+			int iInDat1 = cSerial.WaitLngData();
+			if (iInDat1 != 0) {
+				buffer = std::make_unique<BYTE[]>(iInDat1); // Используем unique_ptr
+				cSerial.ReadData(buffer.get(), iInDat1);
+				if ((CString)buffer.get() != L"\r\nOK\r\n") {
+					InSTATIC(std::move(buffer), iInDat1); // Передача владения буфером
+
+				}
+				else
+				{
+					Sleep(600);
+					buffer.reset();
+					int iInDat1 = cSerial.WaitLngData();
+					if (iInDat1 != 0) {
+						buffer = std::make_unique<BYTE[]>(iInDat1); // Используем unique_ptr
+						cSerial.ReadData(buffer.get(), iInDat1);
+						InSTATIC(std::move(buffer), iInDat1);
+					}
+				}
+
+
+
+
+
+			}
+		}
+
+
+	}
+		else {
 		cSerial.ClosePort();
-		btPort.SetWindowText("Открыть");//вывод в кнопку закрытии порта
+		btPort.SetWindowText(L"Открыть");//вывод в кнопку закрытии порта
 		comPort.EnableWindow(true); //Разблокировка списка параметров
 		comBiteRate.EnableWindow(true);
 		comBitn.EnableWindow(true);
@@ -252,43 +304,81 @@ afx_msg void CCHATIRIDV2Dlg:: OnBnClickedButOpport()
 
 
 // Обработка принятых байт
-void CCHATIRIDV2Dlg::InDATA(BYTE* buffer, int nLen)
-{
+void CCHATIRIDV2Dlg::InDATA(std::unique_ptr<BYTE[]> buffer, int nLen) {
 	CString sDATA;
 	for (int i = 0; i < nLen; i++)
 		sDATA += buffer[i];
-	//this->MessageBoxA((CString)buffer);
-	liReceiv.AddString(sDATA); //ввод данных в список
-	delete[] buffer;
+	//sDATA.SpanIncluding(L"\r\n")
+	  if (sDATA != L"\r\nOK\r\n")
+	liReceiv.AddString(sDATA); // Ввод данных в список
+	if (sDATA.GetLength() == nLen)
+	{
+		CString AT = L"AT+SBDD=0";
+			AT += byte(0x0d);
+		int iLen = AT.GetLength();
+		auto buffer = std::make_unique<BYTE[]>(iLen); // Используем unique_ptr
+		for (int i = 0; i < iLen; i++)
+			buffer[i] = AT[i];
+		int iTX = cSerial.SendData(buffer.get(), iLen);
+		if (iTX != iLen)
+			this->MessageBox(L"Не удалось передать");
+	}
 }
 
+void CCHATIRIDV2Dlg::InSTATIC(std::unique_ptr<BYTE[]> buffer, int nLen) {
+	CString sDATA;
+	for (int i = 0; i < nLen; i++)
+		sDATA += buffer[i];
+	//sDATA.SpanIncluding(L"\r\n")
+	if (sDATA != L"\r\nOK\r\n")
+		IN_IMEI.SetWindowText(sDATA);
+		
+	if (sDATA.GetLength() == nLen)
+	{
+		Sleep(400);
+		AfxBeginThread(StreamData, this);
+	}
+}
 
 //void CCHATIRIDV2Dlg::OnLbnSelchangeLiReceiv()
 //{
 	// TODO: добавьте свой код обработчика уведомлений
 //}
 
-//передача в порт
-void CCHATIRIDV2Dlg::OnBnClickedButSend()
-{
+// Передача в порт
+void CCHATIRIDV2Dlg::OnBnClickedButSend() {
 	CString sOutData;
-
+	CString AT = L"AT+SBDWT=";
 	edSend.GetWindowText(sOutData);
-	int iLen = sOutData.GetLength();
-	BYTE* buffer = new BYTE[iLen];
-	
+	AT += sOutData;
+	AT += byte(0x0d);
+	int iLen = AT.GetLength();
+	auto buffer = std::make_unique<BYTE[]>(iLen); // Используем unique_ptr
 	for (int i = 0; i < iLen; i++)
-		buffer[i] =  sOutData[i];
-	int iTX = cSerial.SendData(buffer, iLen);
-	if (iTX = iLen)
-		//this->MessageBoxA((CString)buffer);
-	delete[] buffer;
+		buffer[i] = AT[i];
+	int iTX = cSerial.SendData(buffer.get(), iLen);
 	if (iTX != iLen)
-		this->MessageBoxA("Не удалось передать");
-
-	
-
-	
+		this->MessageBox(L"Не удалось передать");
+	else {
+		liReceiv.AddString(sOutData);
+		/*Sleep(500);
+		AT = "AT+SBDTC";////копирование из МО в МТ
+		AT += char(0x0d);
+		iLen = AT.GetLength();
+		buffer = std::make_unique<BYTE[]>(iLen); // Используем unique_ptr
+		for (int i = 0; i < iLen; i++)
+			buffer[i] = AT[i];
+		iTX = cSerial.SendData(buffer.get(), iLen);
+	if (iTX == iLen) { AfxBeginThread(StreamData, this); }*/
+		CString AT = L"AT+SBDIX" + char(0x0d); // Инициализация СБД СЕССИИ
+		iLen = AT.GetLength();
+		 buffer = std::make_unique<BYTE[]>(iLen); // Используем unique_ptr
+		for (int i = 0; i < iLen; i++)
+			buffer[i] = AT[i];
+		int iTX = cSerial.SendData(buffer.get(), iLen);
+			if (iTX == iLen) { AfxBeginThread(StreamData, this); }
+		//Sleep(500);
+	}
 }
 
 

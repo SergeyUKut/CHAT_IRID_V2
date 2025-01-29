@@ -6,6 +6,7 @@
 #include "afxwin.h"
 #include "ClassSerial.h"
 #include <cstring>
+#include <memory>
 
 // Диалоговое окно CCHATIRIDV2Dlg
 class CCHATIRIDV2Dlg : public CDialogEx
@@ -13,7 +14,9 @@ class CCHATIRIDV2Dlg : public CDialogEx
 // Создание
 public:
 	CCHATIRIDV2Dlg(CWnd* pParent = nullptr);	// стандартный конструктор
+	
 	afx_msg void OnBnClickedButOpport();
+	//void InDATA(std::unique_ptr<BYTE[]> buffer, int nLen);
 // Данные диалогового окна
 #ifdef AFX_DESIGN_TIME
 	enum { IDD = IDD_CHAT_IRID_V2_DIALOG };
@@ -51,6 +54,8 @@ public:
 	afx_msg void OnCbnSelchangeComStopb();
 	// Поле ввода для передачи
 	CEdit edSend;
+	//IEMI
+	CStatic IN_IMEI;
 	// Поле ввода принятых данных
 	CListBox liReceiv;
 	ClassSerial cSerial; 
@@ -59,10 +64,12 @@ public:
 	// Кнопка открытия/закрытия порта
 	CButton btPort;
 	// Обработка принятых байт
-	void InDATA(BYTE* buffer, int nLen);
+	void InDATA(std::unique_ptr<BYTE[]> buffer, int nLen);
+	void InSTATIC(std::unique_ptr<BYTE[]> buffer, int nLen);
 //	afx_msg void OnLbnSelchangeLiReceiv();
 	afx_msg void OnBnClickedButSend();
 	afx_msg void OnBnClickedButClear();
 	afx_msg void OnEnChangeEdSend();
 	CString str;
+	
 };

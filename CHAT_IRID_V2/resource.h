@@ -17,6 +17,7 @@
 #define IDC_COM_PARY                    1011
 #define IDC_COM_STOPB                   1012
 #define IDC_BUT_CLEAR                   1013
+#define IDC_STAT_IEMI                   1014
 
 // Next default values for new objects
 // 
@@ -24,7 +25,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        131
 #define _APS_NEXT_COMMAND_VALUE         32771
-#define _APS_NEXT_CONTROL_VALUE         1010
+#define _APS_NEXT_CONTROL_VALUE         1015
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
