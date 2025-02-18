@@ -205,7 +205,7 @@ UINT StreamData(LPVOID pParam) {
 				}
 				Sleep(200);
 			}
-			Sleep(600);
+			Sleep(200);
 		}
 		else
 			Sleep(10);
@@ -335,7 +335,7 @@ void CCHATIRIDV2Dlg::InSTATIC(std::unique_ptr<BYTE[]> buffer, int nLen) {
 		
 	if (sDATA.GetLength() == nLen)
 	{
-		Sleep(400);
+		Sleep(600);
 		AfxBeginThread(StreamData, this);
 	}
 }
